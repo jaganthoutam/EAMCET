@@ -1,82 +1,101 @@
-# EAMCET AI Tutor Training Pipeline
+# EAMCET AI Tutor - Zero Manual Pipeline
 
-This project trains custom AI models for EAMCET question extraction and tutoring.
+A fully automated EAMCET AI tutor training pipeline that requires **zero manual annotations**. Uses intelligent pattern recognition to extract questions and answers from EAMCET PDFs automatically.
 
-## Quick Start
+## 🚀 Quick Start
 
-1. **Setup Environment**
-   ```bash
-   # Run the setup script (only once)
-   ./setup.sh
-   
-   # Activate virtual environment
-   source eamcet_env/bin/activate
-   ```
+### Option 1: Google Colab (Recommended)
+1. Open `eamcet_colab_notebook.ipynb` in Google Colab
+2. Update the GitHub repository URL
+3. Run all cells sequentially
+4. Upload your EAMCET PDFs when prompted
+5. Wait for automated processing
 
-2. **Prepare Your Data**
-   - Copy your EAMCET PDFs to a folder
-   - Organize them in this structure:
-   ```
-   your_pdfs/
-   ├── EAMCET-AP/
-   │   ├── MPC/
-   │   └── BiPC/
-   └── EAMCET-TG/
-       ├── MPC/
-       └── BiPC/
-   ```
+### Option 2: Local Setup
+```bash
+# Clone repository
+git clone https://github.com/your-username/eamcet_ai_tutor.git
+cd eamcet_ai_tutor
 
-3. **Extract Data from PDFs**
-   ```bash
-   cd eamcet_ai_tutor
-   python train.py --data_path /path/to/your/pdfs --stage extract
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-4. **Review Extracted Data**
-   - Check the `processed_data/` folder
-   - Review `processing_report.txt` for statistics
-   - Examine extracted images and text
+# Run pipeline
+python eamcet_zero_manual_pipeline.py --input_folder data/raw_pdfs --output_folder results
+```
 
-## Project Structure
+## 🎯 Features
+
+- ✅ **Zero Manual Work**: No annotations required
+- ✅ **Intelligent Extraction**: Uses pattern recognition
+- ✅ **Automatic Training**: Creates training data automatically
+- ✅ **Multi-format Support**: Works with any EAMCET PDF format
+- ✅ **Subject Classification**: Automatically categorizes by subject
+
+## 📊 Supported Formats
+
+- **States**: EAMCET-AP (Andhra Pradesh), EAMCET-TG (Telangana)
+- **Streams**: MPC (Mathematics, Physics, Chemistry), BiPC (Biology, Physics, Chemistry)
+- **Types**: Question papers, answer keys, solutions
+
+## 📁 Project Structure
 
 ```
 eamcet_ai_tutor/
-├── config.py              # Configuration settings
-├── train.py               # Main training script
-├── eamcet_training_starter.py  # PDF processing pipeline
-├── requirements.txt       # Python dependencies
-├── data/                  # Data storage
-│   ├── raw_pdfs/         # Original PDFs
-│   ├── processed_images/ # Extracted page images
-│   ├── annotations/      # Manual annotations
-│   └── augmented/        # Augmented training data
-├── models/               # Trained models
-├── training/             # Training scripts
-├── inference/            # Inference pipeline
-└── logs/                # Training logs
+├── eamcet_zero_manual_pipeline.py    # Main pipeline script
+├── eamcet_colab_notebook.ipynb      # Ready-to-use Colab notebook
+├── requirements.txt                   # Python dependencies
+├── requirements_colab.txt            # Colab-specific requirements
+├── data/
+│   └── raw_pdfs/                    # Upload your PDFs here
+├── colab_results/                   # Pipeline outputs
+└── README_COLAB.md                  # Colab setup instructions
 ```
 
-## Features
+## 🔧 Requirements
 
-- ✅ Multi-state support (AP & TG)
-- ✅ Multi-stream support (MPC & BiPC)
-- ✅ Automatic PDF scanning and organization
-- ✅ High-resolution image extraction
-- ✅ OCR text extraction
-- ✅ Question pattern detection
-- ✅ Answer key format detection
-- ✅ Color-coded answer detection
-- 🔄 Custom model training (coming next)
-- 🔄 AI tutoring system (coming next)
+- Python 3.8+
+- PyMuPDF (for PDF processing)
+- OpenCV (for image processing)
+- Tesseract OCR (for text extraction)
+- Google Colab (for cloud processing)
 
-## Next Steps
+## 📈 Output
 
-1. Run data extraction on your PDFs
-2. Review and verify extracted data
-3. Create manual annotations for training
-4. Train custom models
-5. Build the tutoring application
+The pipeline generates:
+- Extracted questions with options
+- Answer keys with confidence scores
+- Training datasets for AI models
+- Subject-wise categorization
+- Model-ready data structures
 
-## Support
+## 🚨 Important Notes
 
-For issues or questions, check the logs in `processed_data/logs/` or review the processing report.
+1. **PDF Quality**: Works best with high-quality, text-based PDFs
+2. **Format Compatibility**: Designed for standard EAMCET formats
+3. **Processing Time**: 5-15 minutes depending on PDF count and quality
+4. **Memory Requirements**: Google Colab provides sufficient resources
+
+## 📞 Support
+
+- Check `COLAB_QUICK_START.md` for detailed setup instructions
+- Review logs for specific error messages
+- Ensure PDF format matches EAMCET standards
+
+## 🎉 Success Indicators
+
+- Pipeline completes without errors
+- Questions extracted with confidence > 0.7
+- Answer keys properly matched
+- Training data generated successfully
+- Results downloaded as zip file
+
+## 📄 License
+
+This project is open source and available under the MIT License.
+
+---
+
+**Happy training! 🚀**
+
+*Built with ❤️ for EAMCET students and educators*

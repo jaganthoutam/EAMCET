@@ -1,11 +1,56 @@
-eamcet_env/
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.pyw
-*.pyz
-*.pywz
-*.pyzw
-*.pyzwz
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+eamcet_env/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Project specific
+data/processed_images/
+data/annotations/
+data/augmented/
+logs/
+models/*.pth
+models/*.pt
+*.pkl
+*.pickle
+
+# Colab specific
+colab_results/
+test_output/
+eamcet_results.zip
+
+# Temporary files
+*.tmp
+*.temp
