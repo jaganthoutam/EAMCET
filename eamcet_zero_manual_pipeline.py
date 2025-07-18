@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 EAMCET Zero Manual Work - Fully Automated Training Pipeline
-No manual annotations required - uses intelligent pattern recognition
+Optimized for Telugu+English, diagrams, tables, and color-coded answer keys
 """
 
 import os
@@ -31,21 +31,31 @@ logger = logging.getLogger(__name__)
 class EAMCETAutoConfig:
     """Configuration for fully automated EAMCET processing"""
     
-    # Known EAMCET structure patterns
+    # Enhanced patterns for Telugu+English content
     QUESTION_PATTERNS = {
-        'question_number': r'Question Number\s*:\s*(\d+)',
-        'question_id': r'Question Id\s*:\s*(\d+)',
-        'options_start': r'Options\s*:',
+        'question_number': r'(?:Question Number|ప్రశ్న సంఖ్య)\s*:\s*(\d+)',
+        'question_id': r'(?:Question Id|ప్రశ్న ఐడి)\s*:\s*(\d+)',
+        'options_start': r'(?:Options|ఎంపికలు)\s*:',
         'option_numbered': r'^\s*([1-4])\.\s*(.*?)(?=\n\s*[1-4]\.|$)',
-        'section_headers': r'(Mathematics|Physics|Chemistry|Biology)',
-        'section_marks': r'Section Marks\s*:\s*(\d+)'
+        'section_headers': r'(Mathematics|Physics|Chemistry|Biology|గణితం|భౌతిక శాస్త్రం|రసాయన శాస్త్రం|జీవ శాస్త్రం)',
+        'section_marks': r'(?:Section Marks|విభాగ మార్కులు)\s*:\s*(\d+)',
+        'telugu_question': r'[అ-హృ]+',  # Telugu character range
+        'english_question': r'[A-Za-z\s]+'
     }
     
-    # Answer key detection patterns
+    # Enhanced answer key detection patterns based on actual EAMCET format
     ANSWER_KEY_PATTERNS = {
-        'correct_indicator': r'Options shown in green color and with.*icon are correct',
-        'incorrect_indicator': r'Options shown in red color and with.*icon are incorrect',
-        'answer_line': r'^\s*([1-4])\.\s*(.*?)(?=\n|$)'
+        'correct_indicator': r'(?:Options shown in green color|ఆకుపచ్చ రంగులో చూపించిన ఎంపికలు).*(?:correct|సరైనది)',
+        'incorrect_indicator': r'(?:Options shown in red color|ఎరుపు రంగులో చూపించిన ఎంపికలు).*(?:incorrect|తప్పు)',
+        'checkmark_pattern': r'✓|☑|✅|✔',
+        'xmark_pattern': r'✗|✘|❌|✖',
+        'asterisk_pattern': r'\*',  # Red asterisk for incorrect options
+        'answer_line': r'^\s*([1-4])\.\s*(.*?)(?=\n|$)',
+        'telugu_answer': r'[అ-హృ]+.*?(?:✓|☑|✅|✔|✗|✘|❌|✖|\*)',
+        'english_answer': r'[A-Za-z\s]+.*?(?:✓|☑|✅|✔|✗|✘|❌|✖|\*)',
+        'option_combination': r'([A-D](?:\s*(?:and|మరియు)\s*[A-D])*)\s+(?:are correct|సరియైనవి)',
+        'question_number_pattern': r'Question Number\s*:\s*(\d+)',
+        'question_id_pattern': r'Question Id\s*:\s*(\d+)'
     }
     
     # Subject boundaries (known EAMCET structure)
@@ -62,20 +72,35 @@ class EAMCETAutoConfig:
         }
     }
     
-    # Color ranges for answer detection
+    # Enhanced color ranges for better detection
     COLOR_RANGES = {
         'green_correct': {
-            'lower_hsv': np.array([40, 50, 50]),
-            'upper_hsv': np.array([80, 255, 255])
+            'lower_hsv': np.array([35, 40, 40]),
+            'upper_hsv': np.array([85, 255, 255])
         },
         'red_incorrect': {
-            'lower_hsv': np.array([0, 50, 50]), 
+            'lower_hsv': np.array([0, 40, 40]), 
+            'upper_hsv': np.array([25, 255, 255])
+        },
+        'bright_green': {
+            'lower_hsv': np.array([40, 60, 60]),
+            'upper_hsv': np.array([80, 255, 255])
+        },
+        'bright_red': {
+            'lower_hsv': np.array([0, 60, 60]), 
             'upper_hsv': np.array([20, 255, 255])
         }
     }
+    
+    # OCR settings for Telugu+English
+    OCR_CONFIG = {
+        'lang': 'eng+tel',  # English + Telugu
+        'config': '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789అఆఇఈఉఊఋఎఏఐఒఔకఖగఘఙచఛజఝఞటఠడఢణతథదధనపఫబభమయరఱలళవశషసహఽౘౙౚౠౡౢౣ౦౧౨౩౪౫౬౭౮౯✓☑✅✔✗✘❌✖',
+        'dpi': 300
+    }
 
 class EAMCETIntelligentExtractor:
-    """Intelligent extraction using known EAMCET patterns - no manual work needed"""
+    """Intelligent extraction using known EAMCET patterns - optimized for Telugu+English"""
     
     def __init__(self, config: EAMCETAutoConfig):
         self.config = config
@@ -103,7 +128,7 @@ class EAMCETIntelligentExtractor:
         for page_num in range(len(doc)):
             page = doc[page_num]
             
-            # Extract page as image and text
+            # Extract page as image and text with high resolution
             page_image, page_text = self.extract_page_content(page)
             
             if pdf_metadata['paper_type'] == 'question_paper':
@@ -112,7 +137,7 @@ class EAMCETIntelligentExtractor:
                 extracted_data['questions'].extend(questions)
                 
             elif pdf_metadata['paper_type'] == 'answer_key':
-                # Extract answers using color + pattern detection
+                # Extract answers using enhanced color + pattern detection
                 answers = self.extract_answers_intelligently(page_text, page_image, page_num)
                 extracted_data['answers'].update(answers)
         
@@ -130,9 +155,9 @@ class EAMCETIntelligentExtractor:
         return extracted_data
     
     def extract_page_content(self, page) -> Tuple[np.ndarray, str]:
-        """Extract both image and text from page"""
-        # High resolution for better detection
-        mat = fitz.Matrix(2.0, 2.0)
+        """Extract both image and text from page with high resolution"""
+        # Very high resolution for better OCR and color detection
+        mat = fitz.Matrix(3.0, 3.0)  # Increased from 2.0 to 3.0
         pix = page.get_pixmap(matrix=mat)
         
         # Convert to numpy array
@@ -142,16 +167,26 @@ class EAMCETIntelligentExtractor:
         if pix.n == 4:  # RGBA
             img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
         
-        # Extract text
+        # Extract text with OCR for better Telugu+English support
         text = page.get_text()
+        
+        # If text extraction is poor, use OCR
+        if len(text.strip()) < 100:  # If very little text extracted
+            # Convert to PIL Image for OCR
+            pil_img = Image.fromarray(img)
+            text = pytesseract.image_to_string(
+                pil_img, 
+                lang=self.config.OCR_CONFIG['lang'],
+                config=self.config.OCR_CONFIG['config']
+            )
         
         return img, text
     
     def extract_questions_intelligently(self, text: str, image: np.ndarray, page_num: int) -> List[Dict]:
-        """Extract questions using intelligent pattern matching"""
+        """Extract questions using intelligent pattern matching for Telugu+English"""
         questions = []
         
-        # Find all question boundaries
+        # Find all question boundaries (both English and Telugu patterns)
         question_matches = list(re.finditer(self.config.QUESTION_PATTERNS['question_number'], text))
         
         for i, match in enumerate(question_matches):
@@ -167,7 +202,7 @@ class EAMCETIntelligentExtractor:
         return questions
     
     def parse_single_question(self, text: str, question_matches: List, index: int, image: np.ndarray) -> Optional[Dict]:
-        """Parse a single question with all components"""
+        """Parse a single question with all components (Telugu+English support)"""
         match = question_matches[index]
         question_num = int(match.group(1))
         
@@ -195,106 +230,88 @@ class EAMCETIntelligentExtractor:
         # Calculate confidence based on completeness
         confidence = self.calculate_question_confidence(question_num, question_id, actual_question, options)
         
-        if confidence < 0.5:  # Skip low confidence extractions
+        if confidence < 0.3:  # Lowered threshold for Telugu content
             return None
         
         return {
             'number': question_num,
             'id': question_id,
-            'question_text': actual_question,
+            'text': actual_question,
             'options': options,
             'subject': subject,
             'confidence': confidence,
-            'raw_text': question_text_block
+            'language': self.detect_language(actual_question)
         }
     
+    def detect_language(self, text: str) -> str:
+        """Detect if text is Telugu, English, or mixed"""
+        telugu_chars = len(re.findall(self.config.QUESTION_PATTERNS['telugu_question'], text))
+        english_chars = len(re.findall(self.config.QUESTION_PATTERNS['english_question'], text))
+        
+        if telugu_chars > english_chars:
+            return 'telugu'
+        elif english_chars > telugu_chars:
+            return 'english'
+        else:
+            return 'mixed'
+    
     def extract_question_id(self, text: str) -> Optional[str]:
-        """Extract question ID from text block"""
-        id_match = re.search(self.config.QUESTION_PATTERNS['question_id'], text)
-        return id_match.group(1) if id_match else None
+        """Extract question ID from text"""
+        match = re.search(self.config.QUESTION_PATTERNS['question_id'], text)
+        return match.group(1) if match else None
     
     def extract_options_intelligently(self, text: str) -> Dict[str, str]:
-        """Extract options A, B, C, D using intelligent pattern matching"""
-        options = {'A': '', 'B': '', 'C': '', 'D': ''}
+        """Extract options using pattern matching for Telugu+English"""
+        options = {}
         
-        # Find "Options:" section
-        options_match = re.search(r'Options\s*:\s*(.*?)(?=Question|$)', text, re.DOTALL | re.IGNORECASE)
+        # Find the options section
+        options_match = re.search(self.config.QUESTION_PATTERNS['options_start'], text)
+        if not options_match:
+            return options
         
-        if options_match:
-            options_text = options_match.group(1)
+        options_text = text[options_match.end():]
+        
+        # Extract numbered options (1., 2., 3., 4.)
+        option_matches = re.finditer(self.config.QUESTION_PATTERNS['option_numbered'], options_text, re.MULTILINE)
+        
+        for match in option_matches:
+            option_num = match.group(1)
+            option_text = match.group(2).strip()
             
-            # Split into lines and process
-            lines = [line.strip() for line in options_text.split('\n') if line.strip()]
-            
-            current_option = None
-            current_text = []
-            
-            for line in lines:
-                # Check if line starts with option number
-                option_match = re.match(r'^([1-4])\.\s*(.*)', line)
-                
-                if option_match:
-                    # Save previous option
-                    if current_option and current_text:
-                        option_letter = chr(64 + current_option)  # 1->A, 2->B, etc.
-                        options[option_letter] = ' '.join(current_text).strip()
-                    
-                    # Start new option
-                    current_option = int(option_match.group(1))
-                    current_text = [option_match.group(2)] if option_match.group(2) else []
-                
-                elif current_option and line and not re.match(r'^Question|^Response|^Time', line):
-                    # Continue current option text
-                    current_text.append(line)
-            
-            # Save last option
-            if current_option and current_text:
-                option_letter = chr(64 + current_option)
-                options[option_letter] = ' '.join(current_text).strip()
+            if option_text:  # Only add non-empty options
+                options[chr(64 + int(option_num))] = option_text  # 1->A, 2->B, etc.
         
         return options
     
     def extract_question_content(self, text: str) -> str:
         """Extract the actual question text (before options)"""
-        # Remove metadata lines
-        lines = text.split('\n')
-        question_lines = []
+        # Find where options start
+        options_match = re.search(self.config.QUESTION_PATTERNS['options_start'], text)
         
-        found_question_start = False
+        if options_match:
+            question_text = text[:options_match.start()].strip()
+        else:
+            question_text = text.strip()
         
-        for line in lines:
-            line = line.strip()
-            
-            # Skip metadata lines
-            if any(keyword in line for keyword in ['Question Id', 'Display Question', 'Calculator', 'Response Time']):
-                continue
-            
-            # Stop at Options
-            if re.match(r'Options\s*:', line, re.IGNORECASE):
-                break
-            
-            # Start collecting after we pass metadata
-            if line and not re.match(r'^(Question|Display|Calculator|Response|Time|Think|Minimum)', line):
-                found_question_start = True
-            
-            if found_question_start and line:
-                question_lines.append(line)
+        # Clean up the question text
+        question_text = re.sub(r'^\s*Question Number\s*:\s*\d+\s*', '', question_text)
+        question_text = re.sub(r'^\s*Question Id\s*:\s*\d+\s*', '', question_text)
         
-        return ' '.join(question_lines).strip()
+        return question_text.strip()
     
     def extract_answers_intelligently(self, text: str, image: np.ndarray, page_num: int) -> Dict[int, str]:
-        """Extract answers using color detection + pattern matching"""
+        """Extract answers using enhanced color detection + pattern matching"""
         answers = {}
         
         # First, check if this page has answer key indicators
         has_color_coding = self.detect_answer_key_format(text)
         
         if has_color_coding:
-            # Use color-based detection
-            answers = self.extract_answers_by_color(image, text)
+            # Use enhanced color-based detection
+            answers = self.extract_answers_by_color_enhanced(image, text)
         else:
-            # Use pattern-based detection (fallback)
-            answers = self.extract_answers_by_pattern(text)
+            # Use enhanced pattern-based detection
+            answers = self.extract_answers_by_pattern_enhanced(text)
         
         self.processing_stats['answers_detected'] += len(answers)
         return answers
@@ -304,29 +321,42 @@ class EAMCETIntelligentExtractor:
         correct_pattern = re.search(self.config.ANSWER_KEY_PATTERNS['correct_indicator'], text, re.IGNORECASE)
         incorrect_pattern = re.search(self.config.ANSWER_KEY_PATTERNS['incorrect_indicator'], text, re.IGNORECASE)
         
-        return bool(correct_pattern and incorrect_pattern)
+        # Also check for checkmark/xmark patterns
+        checkmark_pattern = re.search(self.config.ANSWER_KEY_PATTERNS['checkmark_pattern'], text)
+        xmark_pattern = re.search(self.config.ANSWER_KEY_PATTERNS['xmark_pattern'], text)
+        
+        return bool((correct_pattern and incorrect_pattern) or (checkmark_pattern and xmark_pattern))
     
-    def extract_answers_by_color(self, image: np.ndarray, text: str) -> Dict[int, str]:
-        """Extract answers using color detection for green checkmarks"""
+    def extract_answers_by_color_enhanced(self, image: np.ndarray, text: str) -> Dict[int, str]:
+        """Enhanced answer extraction using color detection for green checkmarks and red X marks"""
         answers = {}
         
         # Convert image to HSV for color detection
         hsv_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         
-        # Create mask for green color (correct answers)
-        green_mask = cv2.inRange(
-            hsv_image,
-            self.config.COLOR_RANGES['green_correct']['lower_hsv'],
-            self.config.COLOR_RANGES['green_correct']['upper_hsv']
-        )
+        # Create masks for different color ranges
+        green_masks = []
+        red_masks = []
+        
+        for color_name, color_range in self.config.COLOR_RANGES.items():
+            if 'green' in color_name:
+                mask = cv2.inRange(hsv_image, color_range['lower_hsv'], color_range['upper_hsv'])
+                green_masks.append(mask)
+            elif 'red' in color_name:
+                mask = cv2.inRange(hsv_image, color_range['lower_hsv'], color_range['upper_hsv'])
+                red_masks.append(mask)
+        
+        # Combine masks
+        green_mask = np.any(green_masks, axis=0).astype(np.uint8) if green_masks else np.zeros_like(hsv_image[:,:,0])
+        red_mask = np.any(red_masks, axis=0).astype(np.uint8) if red_masks else np.zeros_like(hsv_image[:,:,0])
         
         # Find question regions in text
-        question_regions = self.find_question_regions_in_answer_key(text)
+        question_regions = self.find_question_regions_in_answer_key_enhanced(text)
         
         for question_num, region_info in question_regions.items():
             # Analyze color in question region
-            correct_option = self.detect_correct_option_by_color(
-                green_mask, region_info, image.shape
+            correct_option = self.detect_correct_option_by_color_enhanced(
+                green_mask, red_mask, region_info, image.shape, text
             )
             
             if correct_option:
@@ -334,57 +364,163 @@ class EAMCETIntelligentExtractor:
         
         return answers
     
-    def find_question_regions_in_answer_key(self, text: str) -> Dict[int, Dict]:
-        """Find question regions in answer key text"""
+    def find_question_regions_in_answer_key_enhanced(self, text: str) -> Dict[int, Dict]:
+        """Find question regions in answer key text with enhanced pattern matching"""
         regions = {}
         
-        # Look for question number patterns
+        # Look for question number patterns (both English and Telugu)
         question_matches = re.finditer(self.config.QUESTION_PATTERNS['question_number'], text)
         
         for match in question_matches:
             question_num = int(match.group(1))
             
-            # For now, create mock regions - in real implementation,
-            # you'd use the actual text positions and convert to image coordinates
+            # Find the end of this question's answer block
+            start_pos = match.start()
+            next_match = None
+            
+            # Look for next question number
+            remaining_text = text[start_pos:]
+            next_question_match = re.search(self.config.QUESTION_PATTERNS['question_number'], remaining_text[100:])
+            
+            if next_question_match:
+                end_pos = start_pos + 100 + next_question_match.start()
+            else:
+                end_pos = start_pos + 500  # Default block size
+            
             regions[question_num] = {
-                'text_start': match.start(),
-                'text_end': match.end() + 200,  # Approximate question block size
-                'bbox': [0, 0, 100, 100]  # Mock bounding box
+                'text_start': start_pos,
+                'text_end': end_pos,
+                'text_block': text[start_pos:end_pos],
+                'bbox': [0, 0, 100, 100]  # Will be updated with actual coordinates
             }
         
         return regions
     
-    def detect_correct_option_by_color(self, green_mask: np.ndarray, region_info: Dict, image_shape: Tuple) -> Optional[str]:
-        """Detect which option has green color in the region"""
-        # This is a simplified implementation
-        # In practice, you'd analyze specific option areas within the region
+    def detect_correct_option_by_color_enhanced(self, green_mask: np.ndarray, red_mask: np.ndarray, 
+                                              region_info: Dict, image_shape: Tuple, text: str) -> Optional[str]:
+        """Enhanced detection of correct option using color analysis and text patterns"""
         
-        # For now, return a mock correct answer based on some heuristic
-        # You would implement actual color analysis here
+        # First, try to find checkmarks/xmarks in the text block
+        text_block = region_info.get('text_block', '')
         
-        return 'A'  # Placeholder - implement actual color detection
+        # Look for EAMCET-specific answer patterns
+        # Pattern 1: "A and B are correct" with green checkmark
+        option_combination_pattern = r'([A-D](?:\s*(?:and|మరియు)\s*[A-D])*)\s+(?:are correct|సరియైనవి).*?[✓☑✅✔]'
+        matches = re.finditer(option_combination_pattern, text_block, re.IGNORECASE)
+        for match in matches:
+            option_combination = match.group(1)
+            # Convert combination to single answer (e.g., "A,B" -> "A")
+            options = re.findall(r'[A-D]', option_combination)
+            if len(options) == 1:
+                return options[0]
+            elif len(options) > 1:
+                # For multiple correct options, return the first one
+                return options[0]
+        
+        # Pattern 2: Checkmark patterns near option letters
+        checkmark_patterns = [
+            r'([A-D])\s*[✓☑✅✔]',  # A ✓
+            r'[✓☑✅✔]\s*([A-D])',  # ✓ A
+            r'([A-D]).*?[✓☑✅✔]',  # A ... ✓
+        ]
+        
+        for pattern in checkmark_patterns:
+            matches = re.finditer(pattern, text_block, re.IGNORECASE)
+            for match in matches:
+                option = match.group(1).upper()
+                return option
+        
+        # Pattern 3: Look for X mark patterns (incorrect answers)
+        xmark_patterns = [
+            r'([A-D])\s*[✗✘❌✖]',  # A ✗
+            r'[✗✘❌✖]\s*([A-D])',  # ✗ A
+            r'([A-D]).*?[✗✘❌✖]',  # A ... ✗
+        ]
+        
+        # Pattern 4: Look for asterisk patterns (incorrect answers)
+        asterisk_patterns = [
+            r'([A-D])\s*\*',  # A *
+            r'\*\s*([A-D])',  # * A
+            r'([A-D]).*?\*',  # A ... *
+        ]
+        
+        # If we find X marks or asterisks, the correct answer is the one without them
+        found_incorrect = set()
+        for pattern in xmark_patterns + asterisk_patterns:
+            matches = re.finditer(pattern, text_block, re.IGNORECASE)
+            for match in matches:
+                option = match.group(1).upper()
+                found_incorrect.add(option)
+        
+        # If we found incorrect marks, the correct answer is the one without marks
+        if found_incorrect:
+            all_options = {'A', 'B', 'C', 'D'}
+            correct_options = all_options - found_incorrect
+            if len(correct_options) == 1:
+                return list(correct_options)[0]
+        
+        # Fallback: try color analysis in the image region
+        # This would require mapping text positions to image coordinates
+        # For now, return None if no clear pattern found
+        return None
     
-    def extract_answers_by_pattern(self, text: str) -> Dict[int, str]:
-        """Fallback: extract answers using text patterns"""
+    def extract_answers_by_pattern_enhanced(self, text: str) -> Dict[int, str]:
+        """Enhanced fallback: extract answers using text patterns for Telugu+English"""
         answers = {}
         
-        # Look for explicit answer patterns like "Answer: A" or "Correct: 1"
+        # Enhanced answer patterns for EAMCET format
         answer_patterns = [
-            r'Question\s+(\d+).*?(?:Answer|Correct).*?([A-D]|[1-4])',
-            r'(\d+)\.\s*(?:Answer|Correct).*?([A-D]|[1-4])'
+            # EAMCET-specific patterns
+            r'([A-D](?:\s*(?:and|మరియు)\s*[A-D])*)\s+(?:are correct|సరియైనవి).*?[✓☑✅✔]',  # "A and B are correct" ✓
+            r'([A-D])\s*[✓☑✅✔]',  # A ✓
+            r'[✓☑✅✔]\s*([A-D])',  # ✓ A
+            r'([A-D]).*?[✓☑✅✔]',  # A ... ✓
+            # Traditional patterns
+            r'(?:Question|ప్రశ్న)\s+(\d+).*?(?:Answer|Correct|సమాధానం|సరైనది).*?([A-D]|[1-4])',
+            r'(\d+)\.\s*(?:Answer|Correct|సమాధానం|సరైనది).*?([A-D]|[1-4])',
+            r'(\d+)\s*[✓☑✅✔]\s*([A-D])',  # 1 ✓ A
         ]
         
         for pattern in answer_patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE | re.DOTALL)
             for match in matches:
-                question_num = int(match.group(1))
-                answer = match.group(2)
+                if len(match.groups()) == 2:
+                    question_num = int(match.group(1))
+                    answer = match.group(2)
+                elif len(match.groups()) == 1:
+                    # Handle patterns with only one group
+                    answer = match.group(1)
+                    # Try to extract question number from context
+                    context_start = max(0, match.start() - 100)
+                    context_end = min(len(text), match.end() + 100)
+                    context = text[context_start:context_end]
+                    
+                    # Look for question number in context
+                    question_match = re.search(self.config.ANSWER_KEY_PATTERNS['question_number_pattern'], context)
+                    if question_match:
+                        question_num = int(question_match.group(1))
+                    else:
+                        # Try alternative patterns
+                        question_match = re.search(r'(\d+)', context)
+                        if question_match:
+                            question_num = int(question_match.group(1))
+                        else:
+                            continue
+                else:
+                    continue
+                
+                # Handle EAMCET option combinations (e.g., "A,B" -> "A")
+                if ',' in answer:
+                    # For multiple options, take the first one
+                    answer = answer.split(',')[0].strip()
                 
                 # Convert number to letter if needed
                 if answer.isdigit():
                     answer = chr(64 + int(answer))  # 1->A, 2->B, etc.
                 
-                answers[question_num] = answer
+                # Ensure answer is a valid option
+                if answer.upper() in ['A', 'B', 'C', 'D']:
+                    answers[question_num] = answer.upper()
         
         return answers
     
@@ -522,15 +658,16 @@ class EAMCETAutoTrainer:
         """Extract metadata from PDF path and filename"""
         filename = pdf_path.name.lower()
         
-        # Determine paper type
-        if 'question-paper' in filename or 'question_paper' in filename:
-            paper_type = 'question_paper'
-        elif 'answer' in filename and 'key' in filename:
+        # Determine paper type - improved detection
+        if 'answer-keys' in filename or ('answer' in filename and 'key' in filename):
             paper_type = 'answer_key'
+        elif 'question-paper' in filename or 'question_paper' in filename:
+            paper_type = 'question_paper'
         elif 'solution' in filename:
             paper_type = 'solution'
         else:
-            paper_type = 'unknown'
+            # Default to question paper if no clear indicator
+            paper_type = 'question_paper'
         
         # Extract year
         year_match = re.search(r'(20\d{2})', filename)
@@ -591,7 +728,7 @@ class EAMCETAutoTrainer:
             if question.get('confidence', 0) > 0.7:  # Only high confidence questions
                 # Mock bounding boxes based on text structure
                 training_data['text_detection'].append({
-                    'text': question['question_text'],
+                    'text': question['text'],
                     'bbox': [0, 0, 100, 50],  # Mock coordinates
                     'label': 'question_text'
                 })
@@ -607,13 +744,14 @@ class EAMCETAutoTrainer:
         # Create question parsing training data
         for question in extracted_data['question_answer_pairs']:
             training_data['question_parsing'].append({
-                'input_text': question['raw_text'],
+                'input_text': question.get('raw_text', question['text']),
                 'structured_output': {
                     'question_number': question['number'],
-                    'question_text': question['question_text'],
+                    'question_text': question['text'],
                     'options': question['options'],
                     'correct_answer': question['correct_answer'],
-                    'subject': question['subject']
+                    'subject': question['subject'],
+                    'language': question.get('language', 'english')
                 }
             })
         

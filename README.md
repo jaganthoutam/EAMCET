@@ -2,6 +2,10 @@
 
 A complete AI-powered tutoring system for EAMCET exam preparation that automatically extracts questions from PDFs, trains neural networks, and provides intelligent tutoring.
 
+## 📍 Repository
+
+**GitHub URL**: https://github.com/jaganthoutam/EAMCET.git
+
 ## 📁 Project Structure
 
 ```
@@ -11,7 +15,7 @@ eamcet_ai_tutor/
 ├── eamcet_inference.py               # AI tutor inference engine
 ├── eamcet_model_tester.py            # Model testing framework
 ├── create_test_data.py               # Test data generator
-├── COLAB_PIPELINE_GUIDE.md          # Google Colab setup guide
+├── EAMCET_TRAINING_GUIDE.md         # Training instructions
 ├── requirements.txt                  # Python dependencies
 └── README.md                        # This file
 ```
@@ -38,17 +42,72 @@ eamcet_ai_tutor/
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Option 1: Local Setup
+
+#### 1. Clone Repository
+```bash
+git clone https://github.com/jaganthoutam/EAMCET.git
+cd EAMCET
+```
+
+#### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Run Complete Pipeline
+#### 3. Run Complete Pipeline
 ```bash
 # Extract data and train models
 python eamcet_zero_manual_pipeline.py \
     --input_folder data/raw_pdfs \
     --output_folder trained_models
+```
+
+### Option 2: Google Colab Setup
+
+#### 1. Open Google Colab
+- Go to [Google Colab](https://colab.research.google.com/)
+- Create a new notebook
+
+#### 2. Clone Repository
+```python
+# Clone the repository
+!git clone https://github.com/jaganthoutam/EAMCET.git
+%cd EAMCET
+```
+
+#### 3. Install Dependencies
+```python
+# Install required packages
+!pip install -r requirements.txt
+```
+
+#### 4. Upload PDF Data
+```python
+# Upload your EAMCET PDF files to the data/raw_pdfs/ directory
+# You can drag and drop files or use the file upload feature
+```
+
+#### 5. Run Pipeline
+```python
+# Run the complete pipeline
+!python eamcet_zero_manual_pipeline.py \
+    --input_folder data/raw_pdfs \
+    --output_folder trained_models
+```
+
+#### 6. Download Results
+```python
+# Download trained models and results
+from google.colab import files
+import zipfile
+import os
+
+# Create a zip file of results
+!zip -r eamcet_results.zip trained_models/ eamcet_results/
+
+# Download the results
+files.download('eamcet_results.zip')
 ```
 
 ### 3. Use AI Tutor
@@ -115,7 +174,7 @@ After running the pipeline, you'll get:
 | `eamcet_inference.py` | AI tutor application for student interaction |
 | `eamcet_model_tester.py` | Comprehensive model testing framework |
 | `create_test_data.py` | Generates test questions for evaluation |
-| `COLAB_PIPELINE_GUIDE.md` | Google Colab setup and usage guide |
+| `EAMCET_TRAINING_GUIDE.md` | Detailed training instructions |
 
 ## 🔧 Technical Details
 
@@ -152,6 +211,12 @@ The trained models can power:
 - **Practice Platforms**: Personalized question sets
 - **Study Assistants**: Progress tracking and recommendations
 - **Exam Prep Tools**: Performance analysis and predictions
+
+## 📚 Additional Resources
+
+- **Training Guide**: See `EAMCET_TRAINING_GUIDE.md` for detailed training instructions
+- **GitHub Repository**: https://github.com/jaganthoutam/EAMCET.git
+- **Colab Setup**: Use the Google Colab instructions above for cloud-based training
 
 ---
 
