@@ -801,6 +801,20 @@ class EAMCETIntelligentExtractor:
         answer_completeness = len(data['answers']) / max(len(data['questions']), 1)
         
         return (avg_question_confidence + answer_completeness) / 2
+    
+    def match_questions_with_answers(self, questions: List[Dict], answers: Dict[int, str]) -> List[Dict]:
+        """Match questions with their answers automatically"""
+        paired_data = []
+        
+        for question in questions:
+            question_num = question.get('number')
+            if question_num and question_num in answers:
+                paired_question = question.copy()
+                paired_question['correct_answer'] = answers[question_num]
+                paired_data.append(paired_question)
+        
+        logger.info(f"Successfully paired {len(paired_data)} questions with answers")
+        return paired_data
 
 class EAMCETAutoTrainer:
     """Automated trainer that requires no manual annotations"""
@@ -870,7 +884,7 @@ class EAMCETAutoTrainer:
                 logger.error(f"Error processing answer key {pdf_path}: {str(e)}")
         
         # Match questions with answers
-        all_training_data['question_answer_pairs'] = self.match_questions_with_answers(
+        all_training_data['question_answer_pairs'] = self.extractor.match_questions_with_answers(
             all_training_data['questions'], 
             all_training_data['answers']
         )
