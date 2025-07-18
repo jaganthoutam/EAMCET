@@ -113,46 +113,69 @@ class EAMCETIntelligentExtractor:
         }
     
     def extract_from_pdf(self, pdf_path: str, pdf_metadata: Dict) -> Dict:
-        """Extract structured data from PDF using intelligent patterns"""
-        logger.info(f"Processing {pdf_metadata['filename']} with intelligent extraction...")
+        """Extract questions and answers from a single PDF with enhanced answer detection"""
+        logger.info(f"Processing PDF: {pdf_path}")
         
-        doc = fitz.open(pdf_path)
-        extracted_data = {
-            'metadata': pdf_metadata,
-            'questions': [],
-            'answers': {},
-            'subjects': {},
-            'confidence': 0.0
-        }
-        
-        for page_num in range(len(doc)):
-            page = doc[page_num]
+        try:
+            doc = fitz.open(pdf_path)
+            all_questions = []
+            all_answers = {}
             
-            # Extract page as image and text with high resolution
-            page_image, page_text = self.extract_page_content(page)
-            
-            if pdf_metadata['paper_type'] == 'question_paper':
-                # Extract questions using pattern recognition
-                questions = self.extract_questions_intelligently(page_text, page_image, page_num)
-                extracted_data['questions'].extend(questions)
+            for page_num in range(len(doc)):
+                self.current_page = page_num  # Track current page for debug images
+                page = doc[page_num]
                 
-            elif pdf_metadata['paper_type'] == 'answer_key':
-                # Extract answers using enhanced color + pattern detection
-                answers = self.extract_answers_intelligently(page_text, page_image, page_num)
-                extracted_data['answers'].update(answers)
-        
-        doc.close()
-        
-        # Organize by subjects
-        extracted_data['subjects'] = self.organize_by_subjects(
-            extracted_data['questions'], 
-            pdf_metadata.get('stream', 'MPC')
-        )
-        
-        # Calculate confidence score
-        extracted_data['confidence'] = self.calculate_extraction_confidence(extracted_data)
-        
-        return extracted_data
+                # Extract page content
+                image, text = self.extract_page_content(page)
+                
+                # Extract questions
+                questions = self.extract_questions_intelligently(text, image, page_num)
+                all_questions.extend(questions)
+                
+                # Extract answers with enhanced detection
+                answers = self.extract_answers_intelligently(text, image, page_num)
+                all_answers.update(answers)
+                
+                if answers:
+                    logger.info(f"Page {page_num + 1}: Found {len(answers)} answers")
+                else:
+                    logger.info(f"Page {page_num + 1}: No answers detected (may be question page)")
+            
+            doc.close()
+            
+            # Match questions with answers
+            paired_questions = self.match_questions_with_answers(all_questions, all_answers)
+            
+            # Organize by subjects
+            stream = pdf_metadata.get('stream', 'MPC')
+            subjects = self.organize_by_subjects(all_questions, stream)
+            
+            # Calculate confidence
+            confidence = self.calculate_extraction_confidence({
+                'questions': all_questions,
+                'answers': all_answers,
+                'question_answer_pairs': paired_questions
+            })
+            
+            return {
+                'questions': all_questions,
+                'answers': all_answers,
+                'question_answer_pairs': paired_questions,
+                'subjects': subjects,
+                'confidence': confidence,
+                'metadata': pdf_metadata
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing PDF {pdf_path}: {str(e)}")
+            return {
+                'questions': [],
+                'answers': {},
+                'question_answer_pairs': [],
+                'subjects': {},
+                'confidence': 0.0,
+                'metadata': pdf_metadata
+            }
     
     def extract_page_content(self, page) -> Tuple[np.ndarray, str]:
         """Extract both image and text from page with high resolution"""
@@ -348,141 +371,227 @@ class EAMCETIntelligentExtractor:
         
         return bool((correct_pattern and incorrect_pattern) or (checkmark_pattern and xmark_pattern))
     
+    def save_debug_images(self, image: np.ndarray, green_mask: np.ndarray, red_mask: np.ndarray, 
+                         page_num: int, output_dir: str = "debug_images"):
+        """Save debug images showing detected colored regions"""
+        try:
+            import os
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Create debug visualization
+            debug_image = image.copy()
+            
+            # Overlay green regions
+            green_overlay = np.zeros_like(image)
+            green_overlay[green_mask > 0] = [0, 255, 0]  # Green
+            debug_image = cv2.addWeighted(debug_image, 0.7, green_overlay, 0.3, 0)
+            
+            # Overlay red regions
+            red_overlay = np.zeros_like(image)
+            red_overlay[red_mask > 0] = [255, 0, 0]  # Red
+            debug_image = cv2.addWeighted(debug_image, 0.7, red_overlay, 0.3, 0)
+            
+            # Save debug image
+            debug_path = os.path.join(output_dir, f"page_{page_num}_debug.png")
+            cv2.imwrite(debug_path, cv2.cvtColor(debug_image, cv2.COLOR_RGB2BGR))
+            
+            # Save individual masks
+            cv2.imwrite(os.path.join(output_dir, f"page_{page_num}_green_mask.png"), green_mask)
+            cv2.imwrite(os.path.join(output_dir, f"page_{page_num}_red_mask.png"), red_mask)
+            
+            logger.info(f"Debug images saved to {output_dir}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to save debug images: {str(e)}")
+    
     def extract_answers_by_color_enhanced(self, image: np.ndarray, text: str) -> Dict[int, str]:
-        """Enhanced answer extraction using color detection for green checkmarks and red X marks"""
+        """Advanced answer extraction using image processing to detect visual answer indicators"""
         answers = {}
         
-        # Convert image to HSV for color detection
-        hsv_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        
-        # Create masks for different color ranges
-        green_masks = []
-        red_masks = []
-        
-        for color_name, color_range in self.config.COLOR_RANGES.items():
-            if 'green' in color_name:
-                mask = cv2.inRange(hsv_image, color_range['lower_hsv'], color_range['upper_hsv'])
-                green_masks.append(mask)
-            elif 'red' in color_name:
-                mask = cv2.inRange(hsv_image, color_range['lower_hsv'], color_range['upper_hsv'])
-                red_masks.append(mask)
-        
-        # Combine masks
-        green_mask = np.any(green_masks, axis=0).astype(np.uint8) if green_masks else np.zeros_like(hsv_image[:,:,0])
-        red_mask = np.any(red_masks, axis=0).astype(np.uint8) if red_masks else np.zeros_like(hsv_image[:,:,0])
-        
-        # Find question regions in text
-        question_regions = self.find_question_regions_in_answer_key_enhanced(text)
-        
-        for question_num, region_info in question_regions.items():
-            # Analyze color in question region
-            correct_option = self.detect_correct_option_by_color_enhanced(
-                green_mask, red_mask, region_info, image.shape, text
+        try:
+            # Convert image to HSV for better color detection
+            hsv_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+            
+            # Enhanced color ranges for EAMCET answer indicators
+            color_ranges = {
+                'green_checkmark': {
+                    'lower': np.array([35, 50, 50]),
+                    'upper': np.array([85, 255, 255])
+                },
+                'red_xmark': {
+                    'lower': np.array([0, 50, 50]),
+                    'upper': np.array([25, 255, 255])
+                },
+                'bright_green': {
+                    'lower': np.array([40, 80, 80]),
+                    'upper': np.array([80, 255, 255])
+                },
+                'bright_red': {
+                    'lower': np.array([0, 80, 80]),
+                    'upper': np.array([20, 255, 255])
+                }
+            }
+            
+            # Create masks for each color
+            masks = {}
+            for color_name, ranges in color_ranges.items():
+                mask = cv2.inRange(hsv_image, ranges['lower'], ranges['upper'])
+                masks[color_name] = mask
+            
+            # Combine green masks and red masks
+            green_mask = cv2.bitwise_or(masks['green_checkmark'], masks['bright_green'])
+            red_mask = cv2.bitwise_or(masks['red_xmark'], masks['bright_red'])
+            
+            # Save debug images
+            self.save_debug_images(image, green_mask, red_mask, getattr(self, 'current_page', 0))
+            
+            # Find contours of colored regions
+            green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            red_contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # Extract question numbers from text
+            question_numbers = self.extract_question_numbers_from_text(text)
+            
+            # Map colored regions to question numbers
+            answers = self.map_colored_regions_to_questions(
+                green_contours, red_contours, question_numbers, image.shape
             )
             
-            if correct_option:
-                answers[question_num] = correct_option
+            logger.info(f"Found {len(answers)} answers using color detection")
+            
+        except Exception as e:
+            logger.warning(f"Color detection failed: {str(e)}")
         
         return answers
     
-    def find_question_regions_in_answer_key_enhanced(self, text: str) -> Dict[int, Dict]:
-        """Find question regions in answer key text with enhanced pattern matching"""
-        regions = {}
+    def extract_question_numbers_from_text(self, text: str) -> List[int]:
+        """Extract all question numbers from text"""
+        question_numbers = []
         
-        # Look for question number patterns (both English and Telugu)
-        question_matches = re.finditer(self.config.QUESTION_PATTERNS['question_number'], text)
+        # Multiple patterns for question numbers
+        patterns = [
+            r'(\d+)',  # Simple number
+            r'Question\s+(\d+)',  # Question 1
+            r'(\d+)\.',  # 1.
+            r'(\d+)\s*[✓☑✅✔✗✘❌✖]',  # 1 ✓
+        ]
         
-        for match in question_matches:
-            question_num = int(match.group(1))
-            
-            # Find the end of this question's answer block
-            start_pos = match.start()
-            next_match = None
-            
-            # Look for next question number
-            remaining_text = text[start_pos:]
-            next_question_match = re.search(self.config.QUESTION_PATTERNS['question_number'], remaining_text[100:])
-            
-            if next_question_match:
-                end_pos = start_pos + 100 + next_question_match.start()
-            else:
-                end_pos = start_pos + 500  # Default block size
-            
-            regions[question_num] = {
-                'text_start': start_pos,
-                'text_end': end_pos,
-                'text_block': text[start_pos:end_pos],
-                'bbox': [0, 0, 100, 100]  # Will be updated with actual coordinates
-            }
+        for pattern in patterns:
+            matches = re.finditer(pattern, text)
+            for match in matches:
+                try:
+                    num = int(match.group(1))
+                    if 1 <= num <= 160:  # Valid EAMCET question range
+                        question_numbers.append(num)
+                except ValueError:
+                    continue
         
-        return regions
+        # Remove duplicates and sort
+        question_numbers = sorted(list(set(question_numbers)))
+        return question_numbers
     
-    def detect_correct_option_by_color_enhanced(self, green_mask: np.ndarray, red_mask: np.ndarray, 
-                                              region_info: Dict, image_shape: Tuple, text: str) -> Optional[str]:
-        """Enhanced detection of correct option using color analysis and text patterns"""
+    def map_colored_regions_to_questions(self, green_contours, red_contours, question_numbers, image_shape) -> Dict[int, str]:
+        """Map colored regions to question numbers and determine correct answers"""
+        answers = {}
         
-        # First, try to find checkmarks/xmarks in the text block
-        text_block = region_info.get('text_block', '')
+        if not question_numbers:
+            return answers
         
-        # Look for EAMCET-specific answer patterns
-        # Pattern 1: "A and B are correct" with green checkmark
-        option_combination_pattern = r'([A-D](?:\s*(?:and|మరియు)\s*[A-D])*)\s+(?:are correct|సరియైనవి).*?[✓☑✅✔]'
-        matches = re.finditer(option_combination_pattern, text_block, re.IGNORECASE)
-        for match in matches:
-            option_combination = match.group(1)
-            # Convert combination to single answer (e.g., "A,B" -> "A")
-            options = re.findall(r'[A-D]', option_combination)
-            if len(options) == 1:
-                return options[0]
-            elif len(options) > 1:
-                # For multiple correct options, return the first one
-                return options[0]
+        # Calculate image dimensions
+        height, width = image_shape[:2]
         
-        # Pattern 2: Checkmark patterns near option letters
-        checkmark_patterns = [
-            r'([A-D])\s*[✓☑✅✔]',  # A ✓
-            r'[✓☑✅✔]\s*([A-D])',  # ✓ A
-            r'([A-D]).*?[✓☑✅✔]',  # A ... ✓
-        ]
+        # Create a grid to map positions to question numbers
+        # Assume questions are arranged in a grid pattern
+        questions_per_row = 4  # Typical layout
+        rows = (len(question_numbers) + questions_per_row - 1) // questions_per_row
         
-        for pattern in checkmark_patterns:
-            matches = re.finditer(pattern, text_block, re.IGNORECASE)
-            for match in matches:
-                option = match.group(1).upper()
-                return option
+        # Calculate cell dimensions
+        cell_width = width // questions_per_row
+        cell_height = height // rows if rows > 0 else height
         
-        # Pattern 3: Look for X mark patterns (incorrect answers)
-        xmark_patterns = [
-            r'([A-D])\s*[✗✘❌✖]',  # A ✗
-            r'[✗✘❌✖]\s*([A-D])',  # ✗ A
-            r'([A-D]).*?[✗✘❌✖]',  # A ... ✗
-        ]
+        # Map question numbers to grid positions
+        question_positions = {}
+        for i, question_num in enumerate(question_numbers):
+            row = i // questions_per_row
+            col = i % questions_per_row
+            x1 = col * cell_width
+            y1 = row * cell_height
+            x2 = (col + 1) * cell_width
+            y2 = (row + 1) * cell_height
+            question_positions[question_num] = (x1, y1, x2, y2)
         
-        # Pattern 4: Look for asterisk patterns (incorrect answers)
-        asterisk_patterns = [
-            r'([A-D])\s*\*',  # A *
-            r'\*\s*([A-D])',  # * A
-            r'([A-D]).*?\*',  # A ... *
-        ]
+        # Analyze green contours (correct answers)
+        for contour in green_contours:
+            if cv2.contourArea(contour) > 50:  # Filter small noise
+                # Get bounding box of contour
+                x, y, w, h = cv2.boundingRect(contour)
+                center_x = x + w // 2
+                center_y = y + h // 2
+                
+                # Find which question this belongs to
+                for question_num, (qx1, qy1, qx2, qy2) in question_positions.items():
+                    if qx1 <= center_x <= qx2 and qy1 <= center_y <= qy2:
+                        # Determine which option (A, B, C, D) this represents
+                        option = self.determine_option_from_position(center_x, center_y, qx1, qy1, qx2, qy2)
+                        if option:
+                            answers[question_num] = option
+                            break
         
-        # If we find X marks or asterisks, the correct answer is the one without them
-        found_incorrect = set()
-        for pattern in xmark_patterns + asterisk_patterns:
-            matches = re.finditer(pattern, text_block, re.IGNORECASE)
-            for match in matches:
-                option = match.group(1).upper()
-                found_incorrect.add(option)
+        # Analyze red contours (incorrect answers) to eliminate options
+        for contour in red_contours:
+            if cv2.contourArea(contour) > 50:  # Filter small noise
+                x, y, w, h = cv2.boundingRect(contour)
+                center_x = x + w // 2
+                center_y = y + h // 2
+                
+                for question_num, (qx1, qy1, qx2, qy2) in question_positions.items():
+                    if qx1 <= center_x <= qx2 and qy1 <= center_y <= qy2:
+                        # Mark this option as incorrect
+                        incorrect_option = self.determine_option_from_position(center_x, center_y, qx1, qy1, qx2, qy2)
+                        if incorrect_option and question_num in answers:
+                            # If we already have a correct answer, verify it's not the same
+                            if answers[question_num] == incorrect_option:
+                                # Remove this answer as it's marked incorrect
+                                del answers[question_num]
         
-        # If we found incorrect marks, the correct answer is the one without marks
-        if found_incorrect:
-            all_options = {'A', 'B', 'C', 'D'}
-            correct_options = all_options - found_incorrect
-            if len(correct_options) == 1:
-                return list(correct_options)[0]
+        return answers
+    
+    def determine_option_from_position(self, center_x, center_y, qx1, qy1, qx2, qy2) -> Optional[str]:
+        """Determine option (A, B, C, D) based on position within question cell"""
+        cell_width = qx2 - qx1
+        cell_height = qy2 - qy1
         
-        # Fallback: try color analysis in the image region
-        # This would require mapping text positions to image coordinates
-        # For now, return None if no clear pattern found
+        # Calculate relative position within the cell
+        rel_x = (center_x - qx1) / cell_width
+        rel_y = (center_y - qy1) / cell_height
+        
+        # Common EAMCET layout patterns
+        # Pattern 1: Options arranged horizontally A B C D
+        if rel_y < 0.5:  # Upper half of cell
+            if rel_x < 0.25:
+                return 'A'
+            elif rel_x < 0.5:
+                return 'B'
+            elif rel_x < 0.75:
+                return 'C'
+            else:
+                return 'D'
+        
+        # Pattern 2: Options arranged vertically
+        # A
+        # B  
+        # C
+        # D
+        else:  # Lower half of cell
+            if rel_y < 0.625:
+                return 'A'
+            elif rel_y < 0.75:
+                return 'B'
+            elif rel_y < 0.875:
+                return 'C'
+            else:
+                return 'D'
+        
         return None
     
     def extract_answers_by_pattern_enhanced(self, text: str) -> Dict[int, str]:
@@ -546,12 +655,12 @@ class EAMCETIntelligentExtractor:
         return answers
     
     def extract_answers_by_visual_icons(self, text: str) -> Dict[int, str]:
-        """Extract answers by looking for visual icons and symbols"""
+        """Advanced visual icon detection for EAMCET answer keys"""
         answers = {}
         
         # Enhanced patterns for visual answer indicators
         visual_patterns = [
-            # Checkmark patterns with question numbers
+            # Direct checkmark patterns with question numbers
             r'(\d+)\s*[✓☑✅✔]\s*([A-D])',  # 1 ✓ A
             r'([A-D])\s*[✓☑✅✔]\s*(\d+)',  # A ✓ 1
             r'(\d+)\s*([A-D])\s*[✓☑✅✔]',  # 1 A ✓
@@ -571,7 +680,18 @@ class EAMCETIntelligentExtractor:
             # Bold/Highlighted patterns
             r'(\d+)\s*([A-D])\s*\*\*',  # 1 A **
             r'(\d+)\s*\*\*\s*([A-D])',  # 1 ** A
+            
+            # EAMCET-specific patterns
+            r'(\d+)\s*([A-D])\s*(?:correct|సరైనది)',  # 1 A correct
+            r'(\d+)\s*(?:correct|సరైనది)\s*([A-D])',  # 1 correct A
+            
+            # Telugu patterns
+            r'(\d+)\s*([A-D])\s*సరైనది',  # 1 A సరైనది
+            r'(\d+)\s*సరైనది\s*([A-D])',  # 1 సరైనది A
         ]
+        
+        # Track incorrect answers to find correct ones by elimination
+        incorrect_answers = {}
         
         for pattern in visual_patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE)
@@ -595,9 +715,35 @@ class EAMCETIntelligentExtractor:
                     if any(symbol in match_text for symbol in ['✓', '☑', '✅', '✔', '●', '○', '◎']):
                         answers[question_num] = option
                     elif any(symbol in match_text for symbol in ['✗', '✘', '❌', '✖', '*']):
-                        # This is an incorrect answer, so we need to find the correct one
-                        # For now, we'll skip these and focus on positive indicators
-                        continue
+                        # Track incorrect answers
+                        if question_num not in incorrect_answers:
+                            incorrect_answers[question_num] = set()
+                        incorrect_answers[question_num].add(option)
+                    elif 'correct' in match_text.lower() or 'సరైనది' in match_text:
+                        answers[question_num] = option
+        
+        # Use elimination method for questions with incorrect marks
+        for question_num, incorrect_options in incorrect_answers.items():
+            if question_num not in answers:  # Only if we don't already have a correct answer
+                all_options = {'A', 'B', 'C', 'D'}
+                correct_options = all_options - incorrect_options
+                if len(correct_options) == 1:
+                    answers[question_num] = list(correct_options)[0]
+        
+        # Additional pattern: Look for question blocks with options
+        question_block_pattern = r'(\d+)\.\s*(?:[A-D]\s*[✓☑✅✔✗✘❌✖●○◎\*]?\s*)*'
+        block_matches = re.finditer(question_block_pattern, text, re.IGNORECASE)
+        
+        for match in block_matches:
+            question_num = int(match.group(1))
+            block_text = match.group(0)
+            
+            # Look for checkmarks in this block
+            checkmark_matches = re.finditer(r'([A-D])\s*[✓☑✅✔]', block_text)
+            for checkmark_match in checkmark_matches:
+                option = checkmark_match.group(1).upper()
+                answers[question_num] = option
+                break
         
         return answers
     
@@ -948,17 +1094,35 @@ def main():
         
         # Provide feedback about answer extraction
         if len(extracted_data['question_answer_pairs']) == 0:
-            print("\n⚠️  ANSWER EXTRACTION LIMITATION:")
-            print("   EAMCET answer keys use visual elements (green checkmarks, red X marks)")
-            print("   These are embedded as images rather than text, making automated extraction difficult")
+            print("\n⚠️  AUTOMATIC ANSWER EXTRACTION STATUS:")
+            print("   The system attempted automatic answer extraction using:")
+            print("   • Color detection (green checkmarks ✓, red X marks ✗)")
+            print("   • Visual icon detection (✓☑✅✔ symbols)")
+            print("   • Pattern matching (Telugu+English)")
+            print("   • Grid-based position mapping")
             print("   ")
-            print("   📋 RECOMMENDED NEXT STEPS:")
-            print("   1. Use the extracted questions for question parsing training")
-            print("   2. Manually extract answers from PDF answer keys")
-            print("   3. Create a separate answer key file with format: 'question_number:answer'")
-            print("   4. Use the manual answers for answer prediction training")
+            print("   📊 EXTRACTION RESULTS:")
+            print(f"   • Questions extracted: {len(extracted_data['questions'])}")
+            print(f"   • Answer keys processed: {len(extracted_data['answers'])}")
+            print(f"   • Questions with answers: {len(extracted_data['question_answer_pairs'])}")
+            print("   ")
+            print("   🔍 DEBUG INFORMATION:")
+            print("   • Debug images saved to 'debug_images/' folder")
+            print("   • Check 'debug_images/page_X_debug.png' to see detected colors")
+            print("   • Green overlay = detected correct answers")
+            print("   • Red overlay = detected incorrect answers")
+            print("   ")
+            print("   📋 NEXT STEPS:")
+            print("   1. Check debug images to verify color detection")
+            print("   2. If colors are detected but answers not found, adjust position mapping")
+            print("   3. Use extracted questions for question parsing training")
+            print("   4. For answer prediction, consider manual answer extraction")
             print("   ")
             print("   📖 See EAMCET_TRAINING_GUIDE.md for detailed instructions")
+        else:
+            print(f"\n✅ AUTOMATIC ANSWER EXTRACTION SUCCESSFUL!")
+            print(f"   Found {len(extracted_data['question_answer_pairs'])} question-answer pairs")
+            print("   Ready for complete model training!")
         
         print("\n✅ ZERO MANUAL WORK PIPELINE COMPLETE!")
         print(f"📁 All data saved to: {args.output_folder}")
