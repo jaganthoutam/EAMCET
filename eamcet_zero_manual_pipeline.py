@@ -300,20 +300,41 @@ class EAMCETIntelligentExtractor:
         return question_text.strip()
     
     def extract_answers_intelligently(self, text: str, image: np.ndarray, page_num: int) -> Dict[int, str]:
-        """Extract answers using enhanced color detection + pattern matching"""
+        """Enhanced answer extraction with better visual detection"""
         answers = {}
         
-        # First, check if this page has answer key indicators
-        has_color_coding = self.detect_answer_key_format(text)
+        # First, check if this looks like an answer key page
+        if not self.detect_answer_key_format(text):
+            return answers
         
-        if has_color_coding:
-            # Use enhanced color-based detection
-            answers = self.extract_answers_by_color_enhanced(image, text)
-        else:
-            # Use enhanced pattern-based detection
-            answers = self.extract_answers_by_pattern_enhanced(text)
+        logger.info(f"Detected answer key format on page {page_num}")
         
-        self.processing_stats['answers_detected'] += len(answers)
+        # Try multiple extraction methods
+        extraction_methods = [
+            ("Color Analysis", self.extract_answers_by_color_enhanced),
+            ("Pattern Matching", self.extract_answers_by_pattern_enhanced),
+            ("Visual Icon Detection", self.extract_answers_by_visual_icons)
+        ]
+        
+        for method_name, method_func in extraction_methods:
+            try:
+                if method_name == "Color Analysis":
+                    method_answers = method_func(image, text)
+                else:
+                    method_answers = method_func(text)
+                
+                if method_answers:
+                    logger.info(f"Found {len(method_answers)} answers using {method_name}")
+                    answers.update(method_answers)
+                    break
+                    
+            except Exception as e:
+                logger.warning(f"Method {method_name} failed: {str(e)}")
+                continue
+        
+        if not answers:
+            logger.warning(f"No answers extracted from page {page_num} - visual elements may require manual processing")
+            
         return answers
     
     def detect_answer_key_format(self, text: str) -> bool:
@@ -521,6 +542,62 @@ class EAMCETIntelligentExtractor:
                 # Ensure answer is a valid option
                 if answer.upper() in ['A', 'B', 'C', 'D']:
                     answers[question_num] = answer.upper()
+        
+        return answers
+    
+    def extract_answers_by_visual_icons(self, text: str) -> Dict[int, str]:
+        """Extract answers by looking for visual icons and symbols"""
+        answers = {}
+        
+        # Enhanced patterns for visual answer indicators
+        visual_patterns = [
+            # Checkmark patterns with question numbers
+            r'(\d+)\s*[✓☑✅✔]\s*([A-D])',  # 1 ✓ A
+            r'([A-D])\s*[✓☑✅✔]\s*(\d+)',  # A ✓ 1
+            r'(\d+)\s*([A-D])\s*[✓☑✅✔]',  # 1 A ✓
+            
+            # X mark patterns (incorrect answers)
+            r'(\d+)\s*[✗✘❌✖]\s*([A-D])',  # 1 ✗ A
+            r'([A-D])\s*[✗✘❌✖]\s*(\d+)',  # A ✗ 1
+            
+            # Asterisk patterns
+            r'(\d+)\s*([A-D])\s*\*',  # 1 A *
+            r'(\d+)\s*\*\s*([A-D])',  # 1 * A
+            
+            # Circle patterns
+            r'(\d+)\s*([A-D])\s*[●○◎]',  # 1 A ●
+            r'(\d+)\s*[●○◎]\s*([A-D])',  # 1 ● A
+            
+            # Bold/Highlighted patterns
+            r'(\d+)\s*([A-D])\s*\*\*',  # 1 A **
+            r'(\d+)\s*\*\*\s*([A-D])',  # 1 ** A
+        ]
+        
+        for pattern in visual_patterns:
+            matches = re.finditer(pattern, text, re.IGNORECASE)
+            for match in matches:
+                if len(match.groups()) == 2:
+                    # Handle both orders: (num, option) and (option, num)
+                    group1, group2 = match.groups()
+                    
+                    # Determine which is question number and which is option
+                    if group1.isdigit() and group2 in ['A', 'B', 'C', 'D']:
+                        question_num = int(group1)
+                        option = group2.upper()
+                    elif group2.isdigit() and group1 in ['A', 'B', 'C', 'D']:
+                        question_num = int(group2)
+                        option = group1.upper()
+                    else:
+                        continue
+                    
+                    # Check if this is a correct answer (checkmark) or incorrect (X/asterisk)
+                    match_text = match.group(0)
+                    if any(symbol in match_text for symbol in ['✓', '☑', '✅', '✔', '●', '○', '◎']):
+                        answers[question_num] = option
+                    elif any(symbol in match_text for symbol in ['✗', '✘', '❌', '✖', '*']):
+                        # This is an incorrect answer, so we need to find the correct one
+                        # For now, we'll skip these and focus on positive indicators
+                        continue
         
         return answers
     
@@ -868,6 +945,20 @@ def main():
         print("\n🎯 TRAINING DATA CREATED:")
         for data_type, samples in training_data.items():
             print(f"   {data_type}: {len(samples)} samples")
+        
+        # Provide feedback about answer extraction
+        if len(extracted_data['question_answer_pairs']) == 0:
+            print("\n⚠️  ANSWER EXTRACTION LIMITATION:")
+            print("   EAMCET answer keys use visual elements (green checkmarks, red X marks)")
+            print("   These are embedded as images rather than text, making automated extraction difficult")
+            print("   ")
+            print("   📋 RECOMMENDED NEXT STEPS:")
+            print("   1. Use the extracted questions for question parsing training")
+            print("   2. Manually extract answers from PDF answer keys")
+            print("   3. Create a separate answer key file with format: 'question_number:answer'")
+            print("   4. Use the manual answers for answer prediction training")
+            print("   ")
+            print("   📖 See EAMCET_TRAINING_GUIDE.md for detailed instructions")
         
         print("\n✅ ZERO MANUAL WORK PIPELINE COMPLETE!")
         print(f"📁 All data saved to: {args.output_folder}")
