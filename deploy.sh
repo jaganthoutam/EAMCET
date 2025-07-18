@@ -26,7 +26,7 @@ git commit -m "Add EAMCET Zero Manual Pipeline with Colab support
 # Check if remote exists
 if ! git remote get-url origin > /dev/null 2>&1; then
     echo "🔗 Please add your GitHub repository as remote:"
-    echo "   git remote add origin https://github.com/YOUR_USERNAME/eamcet_ai_tutor.git"
+    echo "   git remote add origin https://github.com/jaganthoutam/EAMCET.git"
     echo "   Then run: git push -u origin main"
 else
     echo "🚀 Pushing to GitHub..."
