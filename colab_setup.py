@@ -21,7 +21,7 @@ def setup_colab_environment():
     
     try:
         subprocess.run([
-            "git", "clone", repo_url, "eamcet_ai_tutor"
+            "git", "clone", repo_url, "EAMCET"
         ], check=True, capture_output=True, text=True)
         print("✅ Repository cloned successfully")
     except subprocess.CalledProcessError as e:
@@ -51,7 +51,7 @@ def setup_colab_environment():
     print("\n🐍 Step 3: Installing Python dependencies...")
     
     # Change to the project directory
-    os.chdir("eamcet_ai_tutor")
+    os.chdir("EAMCET")
     
     # Install requirements
     try:
@@ -75,7 +75,7 @@ def setup_colab_environment():
     print("\n✅ Environment setup complete!")
     return True
 
-def run_zero_manual_pipeline(data_folder="/content/eamcet_ai_tutor/data/raw_pdfs"):
+def run_zero_manual_pipeline(data_folder="/content/EAMCET/data/raw_pdfs"):
     """Run the zero manual pipeline"""
     print("\n🚀 Running EAMCET Zero Manual Pipeline")
     print("=" * 50)
@@ -150,10 +150,10 @@ def create_colab_notebook():
         "!apt-get install -y tesseract-ocr tesseract-ocr-eng libtesseract-dev libgl1-mesa-glx libglib2.0-0\n",
         "\n",
         "# Clone repository (update with your actual GitHub URL)\n",
-        "!git clone https://github.com/your-username/eamcet_ai_tutor.git\n",
+        "!git clone https://github.com/your-username/EAMCET.git\n",
         "\n",
         "# Install Python dependencies\n",
-        "%cd eamcet_ai_tutor\n",
+        "%cd EAMCET\n",
         "!pip install -r requirements.txt\n",
         "\n",
         "# Verify installation\n",
@@ -395,8 +395,8 @@ This repository contains a fully automated EAMCET AI tutor training pipeline tha
 ### Option 2: Manual Setup
 ```python
 # Clone the repository
-!git clone https://github.com/your-username/eamcet_ai_tutor.git
-%cd eamcet_ai_tutor
+!git clone https://github.com/your-username/EAMCET.git
+%cd EAMCET
 
 # Install dependencies
 !pip install -r requirements_colab.txt
@@ -410,7 +410,7 @@ This repository contains a fully automated EAMCET AI tutor training pipeline tha
 
 ## 📁 File Structure
 ```
-eamcet_ai_tutor/
+EAMCET/
 ├── eamcet_zero_manual_pipeline.py    # Main pipeline script
 ├── requirements_colab.txt             # Colab-specific requirements
 ├── eamcet_colab_notebook.ipynb      # Ready-to-use Colab notebook

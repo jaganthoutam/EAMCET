@@ -1,0 +1,22 @@
+{
+  "extraction_stats": {
+    "total_questions": 7680,
+    "paired_questions": 0,
+    "subjects": {
+      "Mathematics": 3840,
+      "Physics": 1920,
+      "Chemistry": 1920,
+      "Biology": 0
+    }
+  },
+  "training_data_stats": {
+    "text_detection": 3293,
+    "question_parsing": 0,
+    "answer_detection": 0
+  },
+  "model_paths": {
+    "text_detection_model": "colab_results/text_detection.pth",
+    "question_parsing_model": "colab_results/question_parsing.pth",
+    "answer_detection_model": "colab_results/answer_detection.pth"
+  }
+}

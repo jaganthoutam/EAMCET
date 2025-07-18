@@ -13,8 +13,8 @@ This repository contains a fully automated EAMCET AI tutor training pipeline tha
 ### Option 2: Manual Setup
 ```python
 # Clone the repository
-!git clone https://github.com/your-username/eamcet_ai_tutor.git
-%cd eamcet_ai_tutor
+!git clone https://github.com/your-username/EAMCET.git
+%cd EAMCET
 
 # Install dependencies
 !pip install -r requirements_colab.txt
@@ -28,7 +28,7 @@ This repository contains a fully automated EAMCET AI tutor training pipeline tha
 
 ## 📁 File Structure
 ```
-eamcet_ai_tutor/
+EAMCET/
 ├── eamcet_zero_manual_pipeline.py    # Main pipeline script
 ├── requirements_colab.txt             # Colab-specific requirements
 ├── eamcet_colab_notebook.ipynb      # Ready-to-use Colab notebook

@@ -37,7 +37,7 @@
 ./deploy.sh
 
 # Add your GitHub repository (replace YOUR_USERNAME)
-git remote add origin https://github.com/YOUR_USERNAME/eamcet_ai_tutor.git
+git remote add origin https://github.com/jaganthoutam/EAMCET.git
 
 # Push to GitHub
 git push -u origin main
@@ -48,7 +48,7 @@ git push -u origin main
 2. Upload `eamcet_colab_notebook.ipynb`
 3. Update the GitHub URL in the first cell:
    ```python
-   !git clone https://github.com/YOUR_USERNAME/eamcet_ai_tutor.git
+   !git clone https://github.com/jaganthoutam/EAMCET.git
    ```
 4. Run all cells sequentially
 5. Upload your EAMCET PDFs when prompted

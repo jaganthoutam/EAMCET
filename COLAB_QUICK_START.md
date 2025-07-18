@@ -9,7 +9,7 @@
 ### Step 2: Update Repository URL
 In the first code cell, update the GitHub URL:
 ```python
-!git clone https://github.com/YOUR_USERNAME/eamcet_ai_tutor.git
+!git clone https://github.com/jaganthoutam/EAMCET.git
 ```
 
 ### Step 3: Run Setup
